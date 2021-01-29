@@ -17,7 +17,7 @@ library(rlang)
 library(dplyr)
 library(purrr)
 
-df <- read_csv('data/processed/cleaned_data.csv') %>% filter(price <= 100, points >= 80) 
+df <- read_csv('data/processed/cleaned_data.csv') %>% filter(price <= 100, points >= 80) %>% mutate(log_value = log(value))
 
 
 app <- Dash$new(external_stylesheets = dbcThemes$BOOTSTRAP)
@@ -47,7 +47,7 @@ app$layout(
                                     unique(df$variety), function(x){
                                     list(label=x, value=x)
                                         }),
-                            value = 'select a variety',
+                            value = list('Red Blend', 'Chardonnay', 'Merlot'),
                             multi = TRUE,
                             placeholder = 'Select a Variety'
                         ),
@@ -80,16 +80,16 @@ app$layout(
                                 value = list(min(df$points), max(df$points))
                                 ),
                         htmlLabel('Value Ratio'),
-                        dccSlider(
-                                id = 'points_ratio',
-                                min = 1,
-                                max = 10,
+                        dccRangeSlider(
+                                id = 'value_ratio',
+                                min = 0 ,
+                                max = 22,
                                 marks = list(
-                                    "1" = "1°C",
-                                    "5" = "5°C",
-                                    "10" = "10°C"
+                                    "0" = 'low',
+                                    '11' = 'medium',
+                                    '22' = 'high'
                                 ),
-                                value = 5
+                                value = list(0, max(df$value))
                             )
                 ), md = 4),
                 dbcCol(
@@ -109,22 +109,29 @@ app$layout(
                 ),
             dbcCol(
                 list(
-                    dbcRow(
-                        list(
-                            dbcCol(
-                                list(
-                                    htmlH5(id = 'value_number'),
-                                    htmlH4(id = 'value_name'))
-                            )
-                        )
-                    ),
                     htmlBr(),
                     dbcRow(
                         list(
                             dbcCol(
                                 list(
-                                    htmlH5(id = 'points_number'),
-                                    htmlH4(id = 'points_name'))
+                                    htmlH4('Top Wine Value:'),
+                                    htmlH5(id = 'value_name'),
+                                    htmlH6(id = 'value_number'),
+                                    htmlH6(id = 'value_price'))
+                            )
+                        )
+                    ),
+                    htmlBr(),
+                    htmlBr(),
+                    htmlBr(),
+                    dbcRow(
+                        list(
+                            dbcCol(
+                                list(
+                                    htmlH4('Top Wine Score:'),
+                                    htmlH5(id = 'points_name'),
+                                    htmlH6(id = 'points_number'),
+                                    htmlH6(id = 'points_price'))
                             )
                         )
                     )
@@ -151,51 +158,67 @@ app$callback(
 )
 app$callback(
     list(output('points_number', 'children'),
-         output('points_name', 'children')),
+         output('points_name', 'children'),
+         output('points_price', 'children')),
     list(input('state', 'value'),
          input('variety', 'value'),
          input('price', 'value'),
-         input('points', 'value')),
-    function(input_value, input_value2, price_range, points_range) {
+         input('points', 'value'),
+         input('value_ratio', 'value')),
+    function(input_value, input_value2, price_range, points_range, value_range) {
 
         df_filtered <- df %>% 
             filter(state %in% input_value,
                 variety %in% input_value2,
+                between(value, value_range[1], value_range[2]),
                 between(price, price_range[1], price_range[2]),
                 between(points, points_range[1], points_range[2])) %>% 
             arrange(desc(points)) %>% 
-            select(points, title) %>% 
-            slice(1)
-        return(list(round(df_filtered[[1]],2), df_filtered[[2]]))
+            separate(title, c("title", "throwaway"), ' \\(') %>%
+            select(points, title, price) %>% 
+            slice(1) %>%
+            mutate(points = paste('Score:', points, 'pts'), price = paste('Price:', price, '$'))
+        return(list(df_filtered[[1]], df_filtered[[2]], df_filtered[[3]]))
     })
 
 
 
 app$callback(
     list(output('value_number', 'children'),
-         output('value_name', 'children')),
+         output('value_name', 'children'),
+         output('value_price', 'children')),
     list(input('state', 'value'),
          input('variety', 'value'),
          input('price', 'value'),
-         input('points', 'value')),
-    function(input_value, input_value2, price_range, points_range) {
+         input('points', 'value'),
+         input('value_ratio', 'value')),
+    function(selected_state, selected_variety, price_range, points_range, value_range) {
 
         df_filtered <- df %>% 
-            filter(state %in% input_value,
-                variety %in% input_value2,
+            filter(state %in% selected_state,
+                variety %in% selected_variety,
                 between(price, price_range[1], price_range[2]),
+                between(value, value_range[1], value_range[2]),
                 between(points, points_range[1], points_range[2])) %>% 
             arrange(desc(value)) %>% 
-            select(value, title) %>% 
-            slice(1)
-        return(list(round(df_filtered[[1]],2), df_filtered[[2]]))
+            separate(title, c("title", "throwaway"), ' \\(') %>%
+            select(value, title, price) %>% 
+            slice(1) %>% 
+            mutate(value = paste('Value Ratio:', round(value, 2)), price = paste('Price:', price, '$'))
+        return(list(df_filtered[[1]], df_filtered[[2]], df_filtered[[3]]))
     })
 
 app$callback(
     output('bar', 'figure'),
-    list(input('state', 'value')),
-    function(selected_state) {
-        data = data %>% filter(state %in% selected_state)
+    list(input('state', 'value'),
+         input('variety', 'value'),
+         input('price', 'value'),
+         input('points', 'value')),
+    function(selected_state, selected_variety, price_range, points_range) {
+        data = data %>% filter(state %in% selected_state, 
+                variety %in% selected_variety,
+                between(price, price_range[1], price_range[2]),
+                between(points, points_range[1], points_range[2]))
         # data for bar plot
         wine_data <- data %>%
             group_by(variety) %>%
