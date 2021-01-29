@@ -1,10 +1,21 @@
+library("sf")
+library("maps")
+library("rnaturalearth")
+#library("rnaturalearthdata")
+library("tidyr")
 library(dash)
 library(dashCoreComponents)
 library(dashHtmlComponents)
 library(dashBootstrapComponents)
-library(tidyverse)
 library(ggplot2)
 library(plotly)
+library(readr)
+library(dashTable)
+library(stringr)
+library(scales)
+library(rlang)
+library(dplyr)
+library(purrr)
 
 df <- read_csv('data/processed/cleaned_data.csv') %>% filter(price <= 100, points >= 80) 
 
@@ -25,7 +36,7 @@ app$layout(
                                     unique(df$state), function(x){
                                     list(label=x, value=x)
                                         }),
-                            value = 'select your state',
+                            value = 'Oregon',
                             multi = TRUE, 
                             placeholder = 'Select a State'
                         ),
@@ -84,7 +95,7 @@ app$layout(
                 dbcCol(
                     list(
                         htmlBr(),
-                        htmlLabel('Map Should go here')
+                        dccGraph(id='map')
                    ), md = 8)
                 )
             ),
@@ -92,9 +103,9 @@ app$layout(
             list(
                 dbcCol(
                     list(
-                         dccGraph(id='plots')
+                         dccGraph(id='bar')
                         # htmlLabel('Scatter Plot | Bar Plot')
-                    ), md = 4
+                    ), md = 8
                 ),
             dbcCol(
                 list(
@@ -117,12 +128,27 @@ app$layout(
                             )
                         )
                     )
-                ), md = 8
+                ), md = 4
             )
         )
     )  # Change left/right whitespace for the container
 )))
 
+app$callback(
+    output('map', 'figure'),
+    list(input('state', 'value')),
+    function(selected_state) {
+        states_data = states_data %>% filter(state %in% selected_state)
+        wine_colors <- c('#C7DBEA', '#CCCCFF', '#C1BDF4',
+                        '#B6AEE9', '#948EC0', '#8475B2',
+                        '#735BA4', '#624296', '#512888')
+        p <- plot_ly(states_data, 
+        type = 'choropleth', locationmode = 'USA-states',
+        z = ~num_reviews, locations = ~code, color = ~num_reviews, colors = wine_colors)
+        p <- p %>% layout(geo = list(scope = 'usa', projection = list(type = 'albers usa')),
+             title = 'USA exports')
+    }
+)
 app$callback(
     list(output('points_number', 'children'),
          output('points_name', 'children')),
@@ -164,6 +190,52 @@ app$callback(
             slice(1)
         return(list(round(df_filtered[[1]],2), df_filtered[[2]]))
     })
+
+app$callback(
+    output('bar', 'figure'),
+    list(input('state', 'value')),
+    function(selected_state) {
+        data = data %>% filter(state %in% selected_state)
+        # data for bar plot
+        wine_data <- data %>%
+            group_by(variety) %>%
+            summarize(rating = mean(points),
+            price = mean(price),
+            value = mean(value)) %>%
+            arrange(desc(rating)) %>%
+            head(10) %>%
+            mutate(highlight_flag = ifelse(rating == max(rating), T, F))
+        
+        bar_plot <- ggplot(wine_data, aes(x=reorder(variety, -rating),
+                                     rating, fill= variety)) +
+                    geom_bar(stat='identity', show.legend = FALSE) +
+                    scale_y_continuous(limits = c(min(wine_data$rating),
+                                        max(wine_data$rating)),
+                                        oob=rescale_none) +
+                    xlab("Wine Variety") +
+                    ylab("Rating") +
+                    ggtitle(paste0("Rating", ' by ', "Wine Variety")) +
+                    theme_bw() +
+                    ggthemes::scale_fill_tableau() +
+                    theme(axis.text.x = element_text(angle=60, hjust=1),
+                    legend.position = 'none',
+                    panel.grid.major = element_blank()) 
+                    
+
+        scatter_plot <- ggplot(wine_data) +
+                    aes(x = price,
+                        y = value,
+                        color = variety) +
+                    geom_point(size = 2) +
+                    ggthemes::scale_color_tableau()
+                    #ggplotly(p, tooltip = 'variety') %>% layout(dragmode = 'select')
+
+        subplot(ggplotly(bar_plot), ggplotly(scatter_plot), nrows = 1) %>% layout(dragmode = 'select')
+    
+        #ggplotly(new_plot, tooltip = 'rating') %>% layout(dragmode = 'select')
+    }
+)
+
 
 # app$callback(
 #     list(output('value_card', 'children'),
