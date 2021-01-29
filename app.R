@@ -213,12 +213,14 @@ app$callback(
     list(input('state', 'value'),
          input('variety', 'value'),
          input('price', 'value'),
-         input('points', 'value')),
-    function(selected_state, selected_variety, price_range, points_range) {
+         input('points', 'value'),
+         input('value_ratio', 'value')),
+    function(selected_state, selected_variety, price_range, points_range, value_range) {
         data = data %>% filter(state %in% selected_state, 
                 variety %in% selected_variety,
                 between(price, price_range[1], price_range[2]),
-                between(points, points_range[1], points_range[2]))
+                between(points, points_range[1], points_range[2]),
+                between(value, value_range[1], value_range[2]))
         # data for bar plot
         wine_data <- data %>%
             group_by(variety) %>%
