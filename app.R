@@ -1,8 +1,8 @@
-library("sf")
-library("maps")
-library("rnaturalearth")
+library(sf)
+library(maps)
+library(rnaturalearth)
 #library("rnaturalearthdata")
-library("tidyr")
+library(tidyr)
 library(dash)
 library(dashCoreComponents)
 library(dashHtmlComponents)
@@ -17,7 +17,7 @@ library(rlang)
 library(dplyr)
 library(purrr)
 
-df <- read_csv('data/processed/cleaned_data.csv') %>% filter(price <= 100, points >= 80) %>% mutate(log_value = log(value))
+df <- readr::read_csv(here::here('data', 'processed', 'cleaned_data.csv')) %>% filter(price <= 100, points >= 80) %>% mutate(log_value = log(value))
 
 
 app <- Dash$new(external_stylesheets = dbcThemes$BOOTSTRAP)
