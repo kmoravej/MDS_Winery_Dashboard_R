@@ -1,4 +1,3 @@
-library("sf")
 library("maps")
 library("rnaturalearth")
 #library("rnaturalearthdata")
@@ -17,7 +16,22 @@ library(rlang)
 library(dplyr)
 library(purrr)
 
-df <- read_csv(here::here('data', 'processed', 'cleaned_data.csv')) %>% filter(price <= 100, points >= 80)
+data <- read_csv('data/processed/cleaned_data.csv') %>% 
+filter(price <= 100, points >= 80) %>%
+ mutate(log_value = log(value))
+ ## data for states
+ states_data <- data %>%
+  group_by(state) %>%
+  drop_na(price) %>%
+  summarise(mean_price = mean(price),
+            mean_rating = mean(points),
+            mean_value = mean(value),
+            num_reviews = n()) 
+
+# joing the state id
+
+df <- read.csv("https://raw.githubusercontent.com/plotly/datasets/master/2011_us_ag_exports.csv")
+states_data <- left_join(states_data, df %>% select(c('code','state')), by = c("state" = "state"))
 
 
 app <- Dash$new(external_stylesheets = dbcThemes$BOOTSTRAP)
@@ -33,7 +47,7 @@ app$layout(
                         dccDropdown(
                             id = 'state',
                             options = map(
-                                    unique(df$state), function(x){
+                                    unique(data$state), function(x){
                                     list(label=x, value=x)
                                         }),
                             value = 'Oregon',
@@ -44,7 +58,7 @@ app$layout(
                         dccDropdown(
                             id = 'variety',
                             options = map(
-                                    unique(df$variety), function(x){
+                                    unique(data$variety), function(x){
                                     list(label=x, value=x)
                                         }),
                             value = list('Red Blend', 'Chardonnay', 'Merlot'),
@@ -54,8 +68,8 @@ app$layout(
                         htmlLabel('Price Range'),
                         dccRangeSlider(
                                 id = 'price',
-                                min = min(df$price),
-                                max = max(df$price),
+                                min = min(data$price),
+                                max = max(data$price),
                                 marks = list(
                                     "4" = "4$",
                                     "25" = "25$",
@@ -63,13 +77,13 @@ app$layout(
                                     "75" = "75$",
                                     "100" = "100$"
                                 ),
-                                value = list(min(df$price), max(df$price))
+                                value = list(min(data$price), max(data$price))
                             ),
                        htmlLabel('Points Range'),
                        dccRangeSlider(
                                 id = 'points',
-                                min = min(df$points),
-                                max = max(df$points),
+                                min = min(data$points),
+                                max = max(data$points),
                                 marks = list(
                                     "80" = "80",
                                     "85" = "85",
@@ -77,7 +91,7 @@ app$layout(
                                     "95" = "95",
                                     "100" = "100"
                                 ),
-                                value = list(min(df$points), max(df$points))
+                                value = list(min(data$points), max(data$points))
                                 ),
                         htmlLabel('Value Ratio'),
                         dccRangeSlider(
@@ -89,7 +103,7 @@ app$layout(
                                     '11' = 'medium',
                                     '22' = 'high'
                                 ),
-                                value = list(0, max(df$value))
+                                value = list(0, max(data$value))
                             )
                 ), md = 4),
                 dbcCol(
@@ -141,7 +155,6 @@ app$layout(
     )  # Change left/right whitespace for the container
 )))
 
-
 app$callback(
     output('map', 'figure'),
     list(input('state', 'value')),
@@ -168,7 +181,7 @@ app$callback(
          input('value_ratio', 'value')),
     function(input_value, input_value2, price_range, points_range, value_range) {
 
-        df_filtered <- df %>% 
+        df_filtered <- data %>% 
             filter(state %in% input_value,
                 variety %in% input_value2,
                 between(value, value_range[1], value_range[2]),
@@ -195,7 +208,7 @@ app$callback(
          input('value_ratio', 'value')),
     function(selected_state, selected_variety, price_range, points_range, value_range) {
 
-        df_filtered <- df %>% 
+        df_filtered <- data %>% 
             filter(state %in% selected_state,
                 variety %in% selected_variety,
                 between(price, price_range[1], price_range[2]),
@@ -208,7 +221,6 @@ app$callback(
             mutate(value = paste('Value Ratio:', round(value, 2)), price = paste('Price:', price, '$'))
         return(list(df_filtered[[1]], df_filtered[[2]], df_filtered[[3]]))
     })
-
 
 app$callback(
     output('bar', 'figure'),
@@ -258,7 +270,63 @@ app$callback(
                     #ggplotly(p, tooltip = 'variety') %>% layout(dragmode = 'select')
 
         subplot(ggplotly(bar_plot), ggplotly(scatter_plot), nrows = 1) %>% layout(dragmode = 'select')
+    
+        #ggplotly(new_plot, tooltip = 'rating') %>% layout(dragmode = 'select')
     }
 )
+
+
+# app$callback(
+#     list(output('value_card', 'children'),
+#          output('points_card', 'children')),
+#     list(input('state', 'value'),
+#          input('variety', 'value'),
+#          input('price', 'value')),
+#     function(input_value, input_value2, price_range) {
+
+#         df_filtered <- df %>% 
+#             filter(state %in% input_value,
+#                 variety %in% input_value2) %>% 
+#             arrange(desc(price)) %>% 
+#             select(price, title) %>% 
+#             slice(1)
+#         return(list(df_filtered[[1]], df_filtered[[2]]))
+#     })
+
+# app$callback(
+#     list(output('value_card', 'children')),
+#     list(input('variety', 'value'),
+#         input('state', 'value')),
+#     function(variety_selection, state_selection){
+#         variety <- variety_selection
+#         return (variety)
+# })
+
+
+
+# app$callback(
+#     list(output('toy', 'children')),
+#     list(input('price', 'value')),
+#     function(price){
+#         return (list(price[1], price[2]))
+#     })
+
+# app$callback(
+#     output('plots', 'figure'),
+#     list(input('state', 'value'),
+#          input('variety', 'value'),
+#          input('points', 'value'),
+#          input('price', 'value')),
+#     function(state_filter, variety_filter, points_filter, price_filter) {
+
+#         # filtered_df <- filter(df, 
+#         #     points %in% seq(points_filter[1],points_filter[2]),
+#         #     price %in% seq(price_filter[1], price_filter[2]),
+#         #     state == state_filter,
+#         #     variety == variety_filter)
+
+#         scatter = ggplot(df) + aes(x = price, y = points) + geom_point()
+#         plotly(scatter)
+#     })
 
 app$run_server(debug = T)
