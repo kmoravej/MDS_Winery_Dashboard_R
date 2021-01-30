@@ -1,8 +1,8 @@
-library(sf)
-library(maps)
-library(rnaturalearth)
+library("sf")
+library("maps")
+library("rnaturalearth")
 #library("rnaturalearthdata")
-library(tidyr)
+library("tidyr")
 library(dash)
 library(dashCoreComponents)
 library(dashHtmlComponents)
@@ -17,7 +17,7 @@ library(rlang)
 library(dplyr)
 library(purrr)
 
-df <- readr::read_csv(here::here('data', 'processed', 'cleaned_data.csv')) %>% filter(price <= 100, points >= 80) %>% mutate(log_value = log(value))
+df <- read_csv(here::here('data', 'processed', 'cleaned_data.csv')) %>% filter(price <= 100, points >= 80)
 
 
 app <- Dash$new(external_stylesheets = dbcThemes$BOOTSTRAP)
@@ -141,6 +141,7 @@ app$layout(
     )  # Change left/right whitespace for the container
 )))
 
+
 app$callback(
     output('map', 'figure'),
     list(input('state', 'value')),
@@ -208,6 +209,7 @@ app$callback(
         return(list(df_filtered[[1]], df_filtered[[2]], df_filtered[[3]]))
     })
 
+
 app$callback(
     output('bar', 'figure'),
     list(input('state', 'value'),
@@ -256,63 +258,7 @@ app$callback(
                     #ggplotly(p, tooltip = 'variety') %>% layout(dragmode = 'select')
 
         subplot(ggplotly(bar_plot), ggplotly(scatter_plot), nrows = 1) %>% layout(dragmode = 'select')
-    
-        #ggplotly(new_plot, tooltip = 'rating') %>% layout(dragmode = 'select')
     }
 )
 
-
-# app$callback(
-#     list(output('value_card', 'children'),
-#          output('points_card', 'children')),
-#     list(input('state', 'value'),
-#          input('variety', 'value'),
-#          input('price', 'value')),
-#     function(input_value, input_value2, price_range) {
-
-#         df_filtered <- df %>% 
-#             filter(state %in% input_value,
-#                 variety %in% input_value2) %>% 
-#             arrange(desc(price)) %>% 
-#             select(price, title) %>% 
-#             slice(1)
-#         return(list(df_filtered[[1]], df_filtered[[2]]))
-#     })
-
-# app$callback(
-#     list(output('value_card', 'children')),
-#     list(input('variety', 'value'),
-#         input('state', 'value')),
-#     function(variety_selection, state_selection){
-#         variety <- variety_selection
-#         return (variety)
-# })
-
-
-
-# app$callback(
-#     list(output('toy', 'children')),
-#     list(input('price', 'value')),
-#     function(price){
-#         return (list(price[1], price[2]))
-#     })
-
-# app$callback(
-#     output('plots', 'figure'),
-#     list(input('state', 'value'),
-#          input('variety', 'value'),
-#          input('points', 'value'),
-#          input('price', 'value')),
-#     function(state_filter, variety_filter, points_filter, price_filter) {
-
-#         # filtered_df <- filter(df, 
-#         #     points %in% seq(points_filter[1],points_filter[2]),
-#         #     price %in% seq(price_filter[1], price_filter[2]),
-#         #     state == state_filter,
-#         #     variety == variety_filter)
-
-#         scatter = ggplot(df) + aes(x = price, y = points) + geom_point()
-#         plotly(scatter)
-#     })
-
-app$run_server(host = '0.0.0.0')
+app$run_server(debug = T)
